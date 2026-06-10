@@ -4,9 +4,9 @@ Reproducible guide for creating an Oracle TxEventQ topic that can be consumed by
 
 ## Demo Video
 
-<video controls src="./TxEventQ.mp4" title="TxEventQ OKafka PL/SQL producer demo"></video>
+Open the demo video: [TxEventQ.mp4](./TxEventQ.mp4).
 
-If the video does not render inline, open [TxEventQ.mp4](./TxEventQ.mp4).
+GitHub may download repository-hosted videos instead of showing an inline player. For inline playback directly in GitHub, upload the MP4 as a GitHub video attachment or publish it through GitHub Pages.
 
 The recording shows two command-line sessions: one starts the OKafka consumer, and the other runs the SQLcl publisher. When the PL/SQL script enqueues messages into `AIE_EVENTS`, the Java client receives and prints them as Kafka-style records.
 
