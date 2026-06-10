@@ -229,3 +229,12 @@
 - Se corrige la conclusion: ORA-24003 en un BROWSE directo por DBMS_AQ es una senal auxiliar, no una prueba definitiva de fallo OKafka.
 - El diagnostico se amplia con un resumen de asignaciones reales vs placeholder.
 - Nota operativa: un group.id nuevo con auto.offset.reset=earliest consume backlog retenido; para una demo limpia conviene resetear/recrear el topic antes de arrancar el consumidor.
+- Se revisa el repositorio oficial https://github.com/oracle/okafka:
+  - El README lista grants adicionales para OKafka: AQ_USER_ROLE, DBMS_AQIN, DBMS_TEQK y SYS.DBA_RSRC_PLAN_DIRECTIVES.
+  - El ejemplo ConsumerOKafka no llama a partitionsFor() antes de subscribe/poll.
+  - El config oficial incluye default.api.timeout.ms=180000.
+- Se actualizan los artefactos:
+  - scripts/03_grant_okafka_client_prereqs.sql incorpora los grants faltantes.
+  - consumer.properties incorpora default.api.timeout.ms=180000.
+  - AieOkafkaConsumer elimina la llamada diagnostica a partitionsFor().
+  - scripts/04_diagnose_okafka_topic.sql queda solo lectura y no usa DBMS_AQ.DEQUEUE/BROWSE.

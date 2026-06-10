@@ -81,18 +81,22 @@ Run as `ADMIN` or another privileged user:
 sql -S -L -name admin_adbdev2 @scripts/03_grant_okafka_client_prereqs.sql
 ```
 
-Oracle OKafka consumers need more than the queue/topic object. They also need privileges that allow OKafka to discover database sessions, instances, listener endpoints, PDB metadata, and TxEventQ partition assignments.
+Oracle OKafka consumers need more than the queue/topic object. They also need privileges that allow OKafka to discover database sessions, instances, listener endpoints, PDB metadata, Resource Manager metadata, and TxEventQ partition assignments. The script follows the privilege list published in the `oracle/okafka` project README.
 
 The script grants:
 
 ```sql
+grant AQ_USER_ROLE to AIE;
 grant execute on DBMS_AQ to AIE;
 grant execute on DBMS_AQADM to AIE;
+grant execute on DBMS_AQIN to AIE;
+grant execute on DBMS_TEQK to AIE;
 grant select on SYS.GV_$SESSION to AIE;
 grant select on SYS.V_$SESSION to AIE;
 grant select on SYS.GV_$INSTANCE to AIE;
 grant select on SYS.GV_$LISTENER_NETWORK to AIE;
 grant select on SYS.GV_$PDBS to AIE;
+grant select on SYS.DBA_RSRC_PLAN_DIRECTIVES to AIE;
 ```
 
 It also runs:
@@ -514,6 +518,7 @@ oracle.net.tns_admin=wallet/tns_admin
 tns.alias=<wallet-tns-alias>
 group.id=AIE_OKAFKA_CONSUMER_DEMO
 partition.assignment.strategy=org.oracle.okafka.clients.consumer.TxEQAssignor
+default.api.timeout.ms=180000
 key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
 ```
@@ -634,7 +639,7 @@ sql -S -L -name AIE @scripts/04_diagnose_okafka_topic.sql
 
 The diagnostic query shows whether `USER_QUEUE_PARTITION_ASSIGNMENT_TABLE` contains real partition ids or only the placeholder `-1`. A placeholder assignment can be transient; in observed runs OKafka rebalanced after a few minutes and then consumed the backlog.
 
-The optional direct AQ browse test can report `ORA-24003` even when OKafka later consumes. Treat that check as advisory only. The source of truth is whether the assignment table shows real partition ids and whether the Java consumer receives records.
+The diagnostic script is read-only and metadata-focused. It intentionally does not call direct AQ browse/dequeue because that was observed to coincide with OKafka rebalance events.
 
 With a fresh `group.id` and `auto.offset.reset=earliest`, the consumer reads retained backlog. For a clean 10-message demo, reset and recreate the topic before starting the consumer.
 

@@ -130,58 +130,10 @@ SELECT 'V$SESSION' AS object_name, COUNT(*) AS sample_count FROM sys.v_$session 
 SELECT 'GV$INSTANCE' AS object_name, COUNT(*) AS sample_count FROM sys.gv_$instance WHERE ROWNUM <= 1;
 SELECT 'GV$LISTENER_NETWORK' AS object_name, COUNT(*) AS sample_count FROM sys.gv_$listener_network WHERE ROWNUM <= 1;
 SELECT 'GV$PDBS' AS object_name, COUNT(*) AS sample_count FROM sys.gv_$pdbs WHERE ROWNUM <= 1;
+SELECT 'DBA_RSRC_PLAN_DIRECTIVES' AS object_name, COUNT(*) AS sample_count FROM sys.dba_rsrc_plan_directives WHERE ROWNUM <= 1;
 
-prompt Optional direct AQ subscriber browse test
+prompt Diagnostic complete
 
--- Try to browse one message as the newest OKafka subscriber. This does not remove
--- or lock messages permanently. This uses DBMS_AQ directly, so treat failures as
--- advisory for troubleshooting; OKafka may still rebalance and consume normally.
-DECLARE
-  l_subscriber USER_QUEUE_PARTITION_ASSIGNMENT_TABLE.SUBSCRIBER_NAME%TYPE;
-  l_deq_opts   DBMS_AQ.DEQUEUE_OPTIONS_T;
-  l_msg_props  DBMS_AQ.MESSAGE_PROPERTIES_T;
-  l_payload    SYS.AQ$_JMS_BYTES_MESSAGE;
-  l_msgid      RAW(16);
-  l_raw        RAW(32767);
-BEGIN
-  SELECT subscriber_name
-  INTO   l_subscriber
-  FROM   (
-           SELECT subscriber_name,
-                  create_time
-           FROM   user_queue_partition_assignment_table
-           WHERE  queue_name = 'AIE_EVENTS'
-           ORDER  BY create_time DESC
-         )
-  WHERE  ROWNUM = 1;
-
-  DBMS_OUTPUT.PUT_LINE('Browsing as subscriber: ' || l_subscriber);
-
-  l_deq_opts.consumer_name := l_subscriber;
-  l_deq_opts.dequeue_mode  := DBMS_AQ.BROWSE;
-  l_deq_opts.navigation    := DBMS_AQ.FIRST_MESSAGE;
-  l_deq_opts.wait          := 1;
-  l_deq_opts.visibility    := DBMS_AQ.IMMEDIATE;
-
-  DBMS_AQ.DEQUEUE(
-    queue_name         => 'AIE_EVENTS',
-    dequeue_options    => l_deq_opts,
-    message_properties => l_msg_props,
-    payload            => l_payload,
-    msgid              => l_msgid
-  );
-
-  l_payload.GET_BYTES(l_raw);
-  DBMS_OUTPUT.PUT_LINE('Browse OK. msgid=' || RAWTOHEX(l_msgid));
-  DBMS_OUTPUT.PUT_LINE('Payload preview=' || SUBSTR(UTL_RAW.CAST_TO_VARCHAR2(l_raw), 1, 300));
-EXCEPTION
-  WHEN NO_DATA_FOUND THEN
-    DBMS_OUTPUT.PUT_LINE('Browse skipped: no OKafka subscriber assignment exists yet.');
-  WHEN OTHERS THEN
-    DBMS_OUTPUT.PUT_LINE('Browse failed: ' || SQLCODE || ' ' || SQLERRM);
-    IF SQLCODE = -24003 THEN
-      DBMS_OUTPUT.PUT_LINE('Note: ORA-24003 can appear for a direct DBMS_AQ browse while OKafka is still able to rebalance and consume.');
-      DBMS_OUTPUT.PUT_LINE('Action: use the partition assignment summary and the Java consumer log as the source of truth.');
-    END IF;
-END;
-/
+-- This script intentionally does not call DBMS_AQ.DEQUEUE/BROWSE. During testing,
+-- direct AQ browse calls were observed to coincide with OKafka rebalance events,
+-- so this diagnostic remains read-only and metadata-focused.

@@ -5,7 +5,6 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
 import org.apache.kafka.common.header.Header;
-import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.oracle.okafka.clients.consumer.KafkaConsumer;
 
@@ -34,7 +33,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.Set;
@@ -111,13 +109,6 @@ public final class AieOkafkaConsumer {
         try (KafkaConsumer<String, String> okafkaConsumer = new KafkaConsumer<>(consumerProperties)) {
             Consumer<String, String> consumer = okafkaConsumer;
             printDatabaseIdentity(okafkaConsumer);
-
-            try {
-                List<PartitionInfo> partitions = consumer.partitionsFor(topic);
-                System.out.println("Topic metadata partitions: " + partitions);
-            } catch (RuntimeException e) {
-                System.out.println("Topic metadata partitions: not available through partitionsFor() in this OKafka release.");
-            }
 
             consumer.subscribe(Collections.singletonList(topic), new LoggingRebalanceListener());
             System.out.println("Subscribed. Waiting for records...");

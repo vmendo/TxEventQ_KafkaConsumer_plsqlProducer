@@ -69,5 +69,5 @@ Consumer finished. Total consumed: 10
 - If the consumer initially shows `AIE_EVENTS--1`, keep it running for a few minutes. OKafka may later revoke the placeholder and assign real partitions.
 - Use `sql -S -L -name AIE @scripts/04_diagnose_okafka_topic.sql` to inspect subscribers, partition assignments, and queued messages.
 - A fresh `group.id` with `auto.offset.reset=earliest` reads retained backlog. For a clean 10-message demo, reset/recreate the topic before starting the consumer.
-- The optional direct AQ browse test can report `ORA-24003` even when OKafka later consumes. Use real partition assignments and the Java consumer log as the source of truth.
+- The diagnostic script is read-only and does not call direct AQ browse/dequeue.
 - The wallet is prepared under `wallet/tns_admin`.
