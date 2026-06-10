@@ -4,9 +4,9 @@ Guia de reproduccion para crear un topic TxEventQ compatible con consumidores Ka
 
 ## Video de la demo
 
-<video controls src="../TxEventQ.mov" title="Demo TxEventQ OKafka con productor PL/SQL"></video>
+<video controls src="../TxEventQ.mp4" title="Demo TxEventQ OKafka con productor PL/SQL"></video>
 
-Si el video no se renderiza embebido, abrir [TxEventQ.mov](../TxEventQ.mov).
+Si el video no se renderiza embebido, abrir [TxEventQ.mp4](../TxEventQ.mp4).
 
 La grabacion muestra dos sesiones de linea de comandos: una arranca el consumidor OKafka y la otra ejecuta el publisher con SQLcl. Cuando el script PL/SQL encola mensajes en `AIE_EVENTS`, el cliente Java los recibe y los muestra como records tipo Kafka.
 

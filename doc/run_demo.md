@@ -2,7 +2,7 @@
 
 Simple runbook to execute the demo end to end.
 
-Watch [TxEventQ.mov](TxEventQ.mov) first if you want to see the intended two-terminal flow: start the consumer, publish messages from SQLcl, and watch the records arrive.
+Watch [TxEventQ.mp4](TxEventQ.mp4) first if you want to see the intended two-terminal flow: start the consumer, publish messages from SQLcl, and watch the records arrive.
 
 Run the commands from the repository root unless a step explicitly changes directory.
 

@@ -4,7 +4,7 @@ Demo assets for creating an Oracle TxEventQ topic that can be consumed with Orac
 
 ## Demo Video
 
-Watch [TxEventQ.mov](doc/TxEventQ.mov) for a short two-terminal run: one terminal starts the OKafka consumer, and the other publishes messages with SQLcl so the consumed records are visible immediately.
+Watch [TxEventQ.mp4](doc/TxEventQ.mp4) for a short two-terminal run: one terminal starts the OKafka consumer, and the other publishes messages with SQLcl so the consumed records are visible immediately.
 
 ## Intro
 
