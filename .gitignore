@@ -9,3 +9,6 @@ wallet/*.zip
 # Local logs and temporary files
 *.log
 *.tmp
+
+# Internal demo working notes. Keep them local and out of the public repository.
+history/
