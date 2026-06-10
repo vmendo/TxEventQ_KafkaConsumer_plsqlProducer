@@ -1,0 +1,11 @@
+# Build output
+client/okafka-consumer/target/
+
+# Local database wallet material. Keep these files outside public Git repositories.
+wallet/tns_admin/
+wallet/*.zip
+.pwd.txt
+
+# Local logs and temporary files
+*.log
+*.tmp

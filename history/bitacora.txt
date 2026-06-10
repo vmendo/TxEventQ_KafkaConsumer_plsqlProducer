@@ -1,0 +1,231 @@
+2026-06-10
+
+- Se valida que la conexion MCP SQLcl AIE existe y conecta correctamente.
+- Se consulta el esquema AIE con schema_information. Solo existia DBTOOLS$MCP_LOG, objeto interno de auditoria del MCP.
+- Se toma como fuente Oracle AI Database 26ai Transactional Event Queues and Advanced Queuing User's Guide:
+  https://docs.oracle.com/en/database/oracle/oracle-database/26/adque/
+  https://docs.oracle.com/en/database/oracle/oracle-database/26/adque/rel-changes.html
+- Se revisa la documentacion de Kafka APIs for Oracle Transactional Event Queues:
+  https://docs.oracle.com/en/database/oracle/oracle-database/26/adque/Kafka_cient_interface_TEQ.html
+- Decision tecnica: crear el topic/cola con DBMS_AQADM.CREATE_DATABASE_KAFKA_TOPIC, no con CREATE_TRANSACTIONAL_EVENT_QUEUE generico.
+  Motivo: la documentacion indica que KafkaConsumer puede consumir topics creados por KafkaAdmin o por DBMS_AQADM.CREATE_DATABASE_KAFKA_TOPIC.
+- Nombre del topic/cola elegido para la demo: AIE_EVENTS.
+- Numero de particiones inicial: 3.
+- Retencion inicial: 7 dias.
+- Se genera script de creacion: scripts/01_create_okafka_topic.sql.
+- Se genera script de reset: scripts/00_reset_demo.sql.
+- Se ejecuta scripts/01_create_okafka_topic.sql mediante MCP SQLcl con la conexion AIE.
+- Resultado de la ejecucion:
+  - AIE_EVENTS creado correctamente.
+  - USER_QUEUES: NAME=AIE_EVENTS, QUEUE_TABLE=AIE_EVENTS, QUEUE_TYPE=NORMAL_QUEUE, ENQUEUE_ENABLED=YES, DEQUEUE_ENABLED=YES, SHARDED=TRUE.
+  - USER_QUEUE_TABLES: QUEUE_TABLE=AIE_EVENTS, TYPE=JMS_BYTES.
+- Se revisa Oracle Database Advanced Queuing Operations Using PL/SQL y DBMS_AQ package reference para la operacion de enqueue.
+- Se inspeccionan metadatos del tipo SYS.AQ$_JMS_BYTES_MESSAGE desde la BBDD con MCP. El tipo existe y tiene metodos WRITE_BYTES y SET_STRING_PROPERTY.
+- Se valida mediante MCP un bloque de prueba con SYS.AQ$_JMS_BYTES_MESSAGE.CONSTRUCT, WRITE_BYTES, SET_STRING_PROPERTY y DBMS_AQ.ENQUEUE, usando ROLLBACK para no dejar mensajes de prueba.
+- Decision tecnica para publicacion desde PL/SQL:
+  - Usar payload SYS.AQ$_JMS_BYTES_MESSAGE porque el topic AIE_EVENTS fue creado como JMS_BYTES.
+  - Escribir el JSON como bytes con WRITE_BYTES(UTL_RAW.CAST_TO_RAW(...)).
+  - Usar DBMS_AQ.ENQUEUE con visibility ON_COMMIT y delivery PERSISTENT.
+  - Guardar una clave logica en message_properties.correlation y en la propiedad JMS event_key.
+- Se genera script de publicacion: scripts/02_publish_messages.sql.
+- Se intenta ejecutar scripts/02_publish_messages.sql mediante MCP SQLcl. La herramienta no devuelve error, pero tampoco devuelve salida.
+- Se intenta validar con consultas SQL simples por MCP. Las herramientas sql_run/sqlcl_run devuelven salida vacia o null incluso para SELECT USER FROM dual.
+- Estado: script generado en disco, pero publicacion no verificada por MCP. No se continua con acciones de base de datos hasta recibir alternativa o confirmacion.
+- El usuario autoriza usar SQLcl directo porque el MCP no devuelve salida fiable.
+- Se ejecuta SQLcl directo con la conexion AIE y el script scripts/02_publish_messages.sql.
+- Resultado inicial: error PLS-00306 en WRITE_BYTES. La conexion SQLcl directa funciona, pero la firma usada no es valida.
+- Se consulta la especificacion real de SYS.AQ$_JMS_BYTES_MESSAGE en ALL_SOURCE.
+- Hallazgo: SET_BYTES acepta RAW directamente; WRITE_BYTES requiere operation id de la capa JMS/JVM.
+- Se corrige scripts/02_publish_messages.sql para usar SET_BYTES(UTL_RAW.CAST_TO_RAW(...)).
+- Se ejecuta de nuevo el script corregido con SQLcl directo.
+- Resultado: error ORA-25600 Invalid shard. El enqueue requiere MESSAGE_PROPERTIES_T.SHARDID explicito para esta cola TxEventQ/OKafka.
+- Se inspeccionan atributos reales de DBMS_AQ.MESSAGE_PROPERTIES_T. Existe SHARDID.
+- Se ejecuta una prueba sin commit con ROLLBACK para SHARDID 0..8.
+- Resultado de prueba: SHARDID 0,1,2,3,4,5 aceptados; SHARDID 6,7,8 devuelven ORA-25600.
+- Se corrige scripts/02_publish_messages.sql para asignar shardid explicitamente rotando entre 0 y 5.
+- Se ejecuta scripts/02_publish_messages.sql con SQLcl directo usando conexion AIE.
+- Resultado: script ejecutado correctamente, 10 mensajes encolados y COMMIT completado.
+- Se verifica la tabla AIE_EVENTS:
+  - TOTAL_MESSAGES=10.
+  - FIRST_ENQUEUE_TIME=10-JUN-26 10.09.00.755876000 AM GMT.
+  - LAST_ENQUEUE_TIME=10-JUN-26 10.09.00.770999000 AM GMT.
+  - Distribucion fisica por SHARD: 0=4 mensajes, 2=4 mensajes, 4=2 mensajes.
+- Observacion: los SHARDID logicos 0..5 son aceptados, pero la columna fisica SHARD se distribuye en 0, 2 y 4 para las 3 particiones del topic.
+- Se actualizan los scripts SQL para incluir comentarios explicativos en ingles:
+  - scripts/00_reset_demo.sql
+  - scripts/01_create_okafka_topic.sql
+  - scripts/02_publish_messages.sql
+- No se realizan cambios en la base de datos durante esta actualizacion; es solo documentacion dentro de los scripts.
+- Se reescribe doc/aie_txeventq_okafka_demo.md como guia completa para cliente final.
+- La guia explica:
+  - Por que AIE_EVENTS se crea como OKafka topic y no como cola AQ/TxEventQ generica.
+  - Como se crea el topic compatible con consumidores Kafka.
+  - Como se publica desde PL/SQL usando SQLcl, DBMS_AQ y SYS.AQ$_JMS_BYTES_MESSAGE.
+  - Por que se debe indicar MESSAGE_PROPERTIES_T.SHARDID en esta cola.
+  - Como resetear y reproducir la demo.
+- No se realizan cambios en la base de datos durante esta actualizacion; es solo documentacion Markdown.
+- Se reorganiza la documentacion:
+  - doc/aie_txeventq_okafka_demo.md pasa a ser la guia principal en ingles.
+  - doc/es/aie_txeventq_okafka_demo.md conserva la version espanola.
+- A partir de ahora, cualquier avance de la demo debe actualizar ambas versiones de la documentacion.
+- No se realizan cambios en la base de datos durante esta actualizacion; solo se reorganizan ficheros Markdown.
+- Se prepara el wallet para el futuro cliente OKafka:
+  - Se crea <demo-root>/wallet.
+  - Se copia solo el ZIP del wallet de Autonomous Database.
+  - Inicialmente no se descomprime el wallet por instruccion del usuario.
+  - Posteriormente el usuario pide preparar lo necesario para usar el ZIP en el cliente.
+  - Se extrae el wallet en <demo-root>/wallet/tns_admin.
+  - Se valida que tnsnames.ora contiene aliases <wallet-tns-alias>, medium, low, tp y tpurgent.
+  - Se crea <demo-root>/wallet/okafka-consumer.properties.template sin credenciales.
+  - La plantilla usa security.protocol=SSL, oracle.net.tns_admin=<demo-root>/wallet/tns_admin y tns.alias=<wallet-tns-alias>.
+  - Permisos aplicados: wallet=700, ZIP=600.
+  - Permisos aplicados: tns_admin=700, ficheros extraidos=600.
+- Se actualizan ambas guias:
+  - doc/aie_txeventq_okafka_demo.md
+  - doc/es/aie_txeventq_okafka_demo.md
+- No se realizan cambios en la base de datos durante esta actualizacion.
+- Se revisa el POM local de com.oracle.database.messaging:okafka:23.7.0.0.
+- Hallazgo: okafka.jar no es standalone; Maven resuelve dependencias transitivas como ojdbc11, aqapi, oraclepki, javax.jms-api, jta, kafka-clients y slf4j-api.
+- Se valida que Maven 3.5.4 esta disponible en la maquina.
+- Se valida que existe un JDK local con javac en /usr/lib/jvm/java-17-openjdk-17.0.19.0.10-1.0.1.el8.x86_64.
+- Se revisan ejemplos locales de OKafka en <local-okafka-example-dir>.
+- Se revisa con javap la clase org.oracle.okafka.common.utils.ConnectionUtils para entender como OKafka crea conexiones JDBC:
+  - En SSL usa jdbc:oracle:thin:@<tns.alias>.
+  - Usa oracle.net.tns_admin para localizar wallet/tnsnames/ojdbc.properties.
+  - La conexion se crea con OracleDataSource.getConnection().
+- Decision tecnica para el cliente:
+  - Crear un proyecto Maven en client/okafka-consumer.
+  - Permitir ejecucion con mvn exec:java.
+  - Permitir empaquetado como JAR ejecutable con maven-shade-plugin.
+  - No guardar credenciales en ficheros de la demo.
+  - Leer la password desde OKAFKA_PASSWORD.
+  - Crear un TNS_ADMIN temporal en runtime, copiar los ficheros del wallet y generar un ojdbc.properties temporal con user/password.
+- Se generan artefactos del cliente en <demo-root>/client/okafka-consumer:
+  - pom.xml
+  - config/consumer.properties
+  - src/main/java/com/oracle/demo/aie/okafka/AieOkafkaConsumer.java
+  - bin/run-mvn-exec.sh
+  - bin/build-jar.sh
+  - bin/run-jar.sh
+  - README.md
+- El consumidor por defecto:
+  - Topic: AIE_EVENTS.
+  - Consumer group: AIE_OKAFKA_CONSUMER_DEMO.
+  - Max messages: 10.
+  - TNS alias: <wallet-tns-alias>.
+  - Service name: <adb-service-name>.
+  - Deserializadores: StringDeserializer para key/value.
+- Se actualizan ambas guias:
+  - doc/aie_txeventq_okafka_demo.md
+  - doc/es/aie_txeventq_okafka_demo.md
+- Queda pendiente validar compilacion Maven y ejecucion contra la base de datos tras copiar los artefactos finales.
+- Se compila el proyecto Maven en <temporary-build-dir>/client/okafka-consumer con JDK 17.
+- Resultado: build correcto, JAR ejecutable generado como target/aie-okafka-consumer.jar.
+- Se valida que run-jar.sh --help y run-mvn-exec.sh --help funcionan.
+- Primera prueba real de consumidor dentro del sandbox:
+  - El cliente no lee mensajes.
+  - Prueba JDBC pura muestra ORA-17868 / UnknownHostException para <adb-host>.
+  - Conclusion: el sandbox bloquea DNS/red para Java; las pruebas reales del consumidor deben ejecutarse fuera del sandbox.
+- Se prueba el consumidor fuera del sandbox con permiso elevado:
+  - La conexion JDBC interna entra como usuario AIE.
+  - Servicio conectado: <adb-service-name>.
+  - El consumidor crea subscriber, pero inicialmente solo asigna AIE_EVENTS--1 y no lee mensajes.
+- Se valida que AIE no tenia los prerequisitos OKafka sobre vistas dinamicas:
+  - GV$SESSION, V$SESSION, GV$INSTANCE, GV$LISTENER_NETWORK y GV$PDBS devolvian ORA-00942.
+- Se genera script de prerequisitos OKafka:
+  - scripts/03_grant_okafka_client_prereqs.sql.
+  - Debe ejecutarse como ADMIN/admin_adbdev2.
+  - Concede EXECUTE sobre DBMS_AQ y DBMS_AQADM.
+  - Concede SELECT sobre SYS.GV_$SESSION, SYS.V_$SESSION, SYS.GV_$INSTANCE, SYS.GV_$LISTENER_NETWORK y SYS.GV_$PDBS.
+  - Ejecuta DBMS_AQADM.GRANT_PRIV_FOR_RM_PLAN('AIE').
+  - El grant directo sobre SYS.USER_QUEUE_PARTITION_ASSIGNMENT_TABLE devuelve ORA-01031 en ADB ADMIN; se deja como warning porque AIE puede consultar USER_QUEUE_PARTITION_ASSIGNMENT_TABLE en su propio esquema.
+- Se ejecuta scripts/03_grant_okafka_client_prereqs.sql con admin_adbdev2.
+- Se revalida desde AIE:
+  - GV$SESSION OK.
+  - V$SESSION OK.
+  - GV$INSTANCE OK.
+  - GV$LISTENER_NETWORK OK.
+  - GV$PDBS OK.
+  - USER_QUEUE_PARTITION_ASSIGNMENT_TABLE consultable.
+- Se detecta que aplicar grants despues de crear el topic no basta para la demo:
+  - El consumidor crea subscribers pero la asignacion se queda en PARTITION_ID=-1.
+  - Se decide resetear y recrear AIE_EVENTS despues de aplicar los grants.
+- Se ejecuta reset de la demo:
+  - scripts/00_reset_demo.sql elimina AIE_EVENTS y sus subscribers.
+- Se recrea el topic:
+  - scripts/01_create_okafka_topic.sql crea AIE_EVENTS correctamente.
+- Se arranca consumidor OKafka fuera del sandbox con group.id=CG7.
+  - Conexion interna OK como AIE.
+  - Empieza con AIE_EVENTS--1 y posteriormente rebalancea a AIE_EVENTS-0, AIE_EVENTS-1 y AIE_EVENTS-2.
+- Se ejecuta scripts/02_publish_messages.sql mientras el consumidor esta activo.
+- Resultado final validado:
+  - El publisher PL/SQL encola 10 mensajes.
+  - El consumidor OKafka lee 10 mensajes JSON.
+  - Se imprimen key/value y metadatos tipo Kafka.
+  - El consumidor ejecuta commitSync y finaliza con Total consumed: 10.
+- Se actualiza el cliente para que los scripts preparen un TNS_ADMIN temporal:
+  - bin/prepare-okafka-env.sh crea un directorio temporal bajo /tmp.
+  - Copia el wallet.
+  - Genera ojdbc.properties con user/password desde variables de entorno.
+  - Pasa oracle.net.tns_admin a Java.
+  - Limpia el directorio temporal al salir.
+- Se actualizan doc/aie_txeventq_okafka_demo.md y doc/es/aie_txeventq_okafka_demo.md con:
+  - Nuevo script 03 de grants.
+  - Orden correcto de reproduccion.
+  - Nota sobre sandbox/DNS para Java.
+  - Validacion final del consumo OKafka.
+- Se crea documentacion ejecutiva simple para ejecutar la demo paso a paso:
+  - doc/run_demo.md en ingles.
+  - doc/es/ejecutar_demo.md en espanol.
+- La guia corta cubre:
+  - Ejecucion de prerequisitos OKafka.
+  - Reset y recreacion del topic.
+  - Arranque del consumidor con JAR o Maven.
+  - Publicacion de mensajes desde SQLcl.
+  - Resultado esperado del consumidor.
+- Se ajustan documentacion y scripts para publicacion en GitHub:
+  - Se eliminan rutas absolutas del workspace local en doc, scripts y cliente.
+  - Los runbooks asumen ejecucion desde la raiz del repositorio.
+  - El cliente calcula la ruta del wallet a partir de su ubicacion relativa en client/okafka-consumer.
+  - config/consumer.properties usa ../../wallet/tns_admin.
+  - Se anade .gitignore raiz para excluir target/ y material sensible del wallet.
+- Se simplifica el arranque del consumidor:
+  - Se crea run_consumer.sh en la raiz del repositorio.
+  - Si falta wallet/tns_admin, pide el path de un ZIP de wallet ADB o de un directorio de wallet extraido.
+  - Copia/extrae el wallet a wallet/tns_admin y aplica permisos restrictivos.
+  - Si falta .pwd.txt, pide la password del usuario AIE, la guarda localmente y aplica chmod 600.
+  - Ejecuta client/okafka-consumer/bin/run-jar.sh con un group.id nuevo por defecto.
+  - .pwd.txt se anade a .gitignore.
+- Se eliminan dependencias con una ADB concreta de la documentacion y de la configuracion base:
+  - Se sustituyen nombres de wallet, alias TNS, host ADB, service name y password real por placeholders.
+  - run_consumer.sh ahora lee tnsnames.ora y deriva OKAFKA_TNS_ALIAS, OKAFKA_BOOTSTRAP_SERVERS y OKAFKA_SERVICE_NAME en runtime.
+  - consumer.properties queda con placeholders genericos para ejecucion manual.
+  - wallet/okafka-consumer.properties.template queda con placeholders genericos.
+  - .gitignore pasa a ignorar wallet/*.zip ademas de wallet/tns_admin y .pwd.txt.
+  - Se verifica que doc, cliente, templates, scripts y bitacora no contienen identificadores de la ADB local ni password real.
+- Se ajusta el comportamiento por defecto del consumidor OKafka:
+  - config/consumer.properties cambia idle.exit.after.seconds de 30 a 0.
+  - config/consumer.properties cambia max.messages de 10 a 0.
+  - El consumidor queda esperando mensajes sin timeout de inactividad y sin limite de mensajes por defecto.
+  - Se documenta que el proceso se para con Ctrl+C si todavia no se han publicado mensajes.
+  - Se mantiene --max-messages y --idle-timeout-seconds como overrides opcionales para ejecuciones automatizadas.
+  - El cliente Java muestra idle.timeout=disabled y reduce el ruido de avisos cuando no hay records.
+- Se endurecen los scripts Maven del cliente:
+  - bin/build-jar.sh y bin/run-mvn-exec.sh verifican que JAVA_HOME tenga javac.
+  - Si JAVA_HOME apunta a un JRE, cambian al JDK local configurado para la demo.
+  - Si no hay JDK valido, muestran un error explicito.
+- Se diagnostica un caso en el que el consumidor conecta pero no lee:
+  - El publisher PL/SQL confirma commits y AIE_EVENTS contiene mensajes en estado 0.
+  - USER_QUEUE_PARTITION_ASSIGNMENT_TABLE muestra PARTITION_ID=-1 para el grupo activo.
+  - Esto explica el log AIE_EVENTS--1: el consumidor no tiene particiones reales asignadas.
+  - Se crea scripts/04_diagnose_okafka_topic.sql para inspeccionar metadata, subscribers, asignaciones y mensajes.
+  - Se cambia el group.id generado por defecto a un nombre corto tipo CGAIE<timestamp>.
+  - Se declara explicitamente partition.assignment.strategy=org.oracle.okafka.clients.consumer.TxEQAssignor.
+  - El cliente Java avisa cuando recibe solo la asignacion placeholder -1.
+- Se amplia scripts/04_diagnose_okafka_topic.sql con una prueba no destructiva de BROWSE:
+  - La prueba se ejecuta como el subscriber OKafka mas reciente.
+  - En el caso observado devuelve ORA-24003: Queue table index SUBSCRIBER METADATA VERSION# is inconsistent with queue table UGA VERSION#.
+- Observacion posterior: el consumidor OKafka termino rebalanceando desde AIE_EVENTS--1 a AIE_EVENTS-0/1/2 y empezo a consumir.
+- Se corrige la conclusion: ORA-24003 en un BROWSE directo por DBMS_AQ es una senal auxiliar, no una prueba definitiva de fallo OKafka.
+- El diagnostico se amplia con un resumen de asignaciones reales vs placeholder.
+- Nota operativa: un group.id nuevo con auto.offset.reset=earliest consume backlog retenido; para una demo limpia conviene resetear/recrear el topic antes de arrancar el consumidor.

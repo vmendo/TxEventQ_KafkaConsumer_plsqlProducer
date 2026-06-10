@@ -1,0 +1,19 @@
+# OKafka SSL consumer properties template for the AIE TxEventQ demo.
+# Copy this file when building the Java consumer and provide credentials at runtime.
+
+security.protocol=SSL
+oracle.net.tns_admin=wallet/tns_admin
+bootstrap.servers=<adb-host>:1522
+oracle.service.name=<adb-service-name>
+tns.alias=<wallet-tns-alias>
+
+group.id=AIE_OKAFKA_CONSUMER
+enable.auto.commit=false
+max.poll.records=10
+
+key.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+value.deserializer=org.apache.kafka.common.serialization.StringDeserializer
+
+# Demo topic consumed by the Java code. This is not a standard Kafka client property.
+# Keep it here as a deployment hint for the future consumer implementation.
+topic.name=AIE_EVENTS
