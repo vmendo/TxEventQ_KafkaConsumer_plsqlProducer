@@ -10,13 +10,19 @@ If the video does not render inline, open [TxEventQ.mov](./TxEventQ.mov).
 
 The recording shows two command-line sessions: one starts the OKafka consumer, and the other runs the SQLcl publisher. When the PL/SQL script enqueues messages into `AIE_EVENTS`, the Java client receives and prints them as Kafka-style records.
 
-## Use Case: Database Changes as Kafka-Style Events
+## Intro
 
-A common integration requirement is to react to changes that already happen inside Oracle Database: an order is inserted, a payment changes state, or a business table is updated by an existing application. In that model, a database trigger or a PL/SQL package captures the change at the transaction boundary and publishes a compact JSON event to a queue.
+This demo focuses on a narrow, reproducible flow:
 
-This demo shows that pattern with Oracle TxEventQ created as an OKafka-compatible topic. The PL/SQL publisher enqueues JSON messages into `AIE_EVENTS`; a remote Java client uses the Kafka consumer API through Oracle OKafka to receive those events. The remote client keeps Kafka concepts such as topic, consumer group, offset, partition assignment, and poll loop, while the event stream is backed by Oracle Database instead of an external Kafka broker.
+- Create an Oracle TxEventQ topic that is compatible with OKafka consumers.
+- Publish sample JSON messages into that topic from PL/SQL.
+- Consume those messages from a remote Java client using Kafka-style APIs through Oracle OKafka.
 
-The included SQL publisher is intentionally a standalone SQLcl script so the flow is easy to reproduce. In a production design, the same enqueue logic would normally live behind a small PL/SQL package invoked by a trigger or by application code after the business change is validated.
+The demo does not create business tables, detect table changes, define triggers, or implement Change Data Capture. The producer is a standalone SQLcl script so the behavior can be executed, reset, and reviewed without adding application-specific schema objects.
+
+This pattern is useful when the database or PL/SQL layer already knows that a business event has happened and wants to publish that event explicitly. Examples include `ORDER_ACCEPTED`, `PAYMENT_APPROVED`, `BATCH_COMPLETED`, operational notifications from scheduled jobs, or integration events emitted by stored procedures after a business operation completes.
+
+It is not a replacement for a full CDC platform. If the requirement is to capture arbitrary table changes, replicate data, preserve transaction order across many tables, synchronize heterogeneous systems, or move changes into analytics platforms, Oracle GoldenGate is the better architectural fit. Oracle's GoldenGate documentation describes it as supporting high availability, real-time data integration, transactional change data capture, data replication, transformations, and verification between operational and analytical systems.
 
 ## 1. Executive Summary
 
@@ -66,6 +72,8 @@ The implementation is based on the official Oracle documentation:
   https://docs.oracle.com/en/database/oracle/oracle-database/26/arpls/DBMS_AQ.html
 - AQ operations using PL/SQL:
   https://docs.oracle.com/en/database/oracle/oracle-database/26/adque/aq-operations-using-pl-sql.html
+- Oracle GoldenGate 26ai documentation:
+  https://docs.oracle.com/en/database/goldengate/core/26/
 
 ## 4. Why This Queue Is Different
 
