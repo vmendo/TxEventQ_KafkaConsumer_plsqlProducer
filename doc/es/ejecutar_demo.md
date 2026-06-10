@@ -2,6 +2,8 @@
 
 Runbook simple para ejecutar la demo completa.
 
+Ver [TxEventQ.mov](../TxEventQ.mov) primero si quieres revisar el flujo esperado en dos terminales: arrancar el consumidor, publicar mensajes desde SQLcl y ver llegar los records.
+
 Ejecutar los comandos desde la raiz del repositorio salvo que el paso indique un cambio de directorio.
 
 ## 1. Preparar la base de datos

@@ -2,6 +2,22 @@
 
 Guia de reproduccion para crear un topic TxEventQ compatible con consumidores Kafka mediante OKafka, publicar mensajes desde PL/SQL y preparar la demo para un consumidor Java basado en `okafka.jar`.
 
+## Video de la demo
+
+<video controls src="../TxEventQ.mov" title="Demo TxEventQ OKafka con productor PL/SQL"></video>
+
+Si el video no se renderiza embebido, abrir [TxEventQ.mov](../TxEventQ.mov).
+
+La grabacion muestra dos sesiones de linea de comandos: una arranca el consumidor OKafka y la otra ejecuta el publisher con SQLcl. Cuando el script PL/SQL encola mensajes en `AIE_EVENTS`, el cliente Java los recibe y los muestra como records tipo Kafka.
+
+## Caso de uso: cambios en base de datos como eventos tipo Kafka
+
+Un requisito habitual de integracion es reaccionar a cambios que ya ocurren dentro de Oracle Database: se inserta un pedido, cambia el estado de un pago o una aplicacion existente actualiza una tabla de negocio. En ese modelo, un trigger de base de datos o un paquete PL/SQL captura el cambio en el limite transaccional y publica un evento JSON compacto en una cola.
+
+Esta demo muestra ese patron con Oracle TxEventQ creado como topic compatible con OKafka. El publisher PL/SQL encola mensajes JSON en `AIE_EVENTS`; un cliente Java remoto usa la API de consumidor Kafka mediante Oracle OKafka para recibir esos eventos. El cliente remoto mantiene conceptos Kafka como topic, grupo de consumo, offset, asignacion de particiones y bucle de poll, mientras el stream de eventos queda respaldado por Oracle Database en lugar de por un broker Kafka externo.
+
+El publisher incluido es un script SQLcl independiente para que el flujo sea facil de reproducir. En un diseno productivo, la misma logica de enqueue normalmente viviria detras de un paquete PL/SQL pequeno invocado por un trigger o por codigo de aplicacion despues de validar el cambio de negocio.
+
 ## 1. Resumen ejecutivo
 
 Esta demo crea un topic llamado `AIE_EVENTS` dentro del esquema `AIE`.

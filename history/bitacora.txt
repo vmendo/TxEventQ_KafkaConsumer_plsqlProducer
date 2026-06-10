@@ -238,3 +238,12 @@
   - consumer.properties incorpora default.api.timeout.ms=180000.
   - AieOkafkaConsumer elimina la llamada diagnostica a partitionsFor().
   - scripts/04_diagnose_okafka_topic.sql queda solo lectura y no usa DBMS_AQ.DEQUEUE/BROWSE.
+- Se incorpora el video doc/TxEventQ.mov a la documentacion:
+  - La documentacion principal lo enlaza al inicio.
+  - La documentacion en espanol lo enlaza desde doc/es con ruta relativa.
+  - README.md y los runbooks hacen referencia al video para mostrar el flujo de dos terminales.
+- Se anade contexto tipo blog sobre el caso de uso:
+  - Cambios en tablas de negocio capturados por triggers o paquetes PL/SQL.
+  - Publicacion de eventos JSON en TxEventQ desde PL/SQL.
+  - Consumo remoto con cliente Kafka mediante Oracle OKafka.
+  - La demo usa un script SQLcl como simulacion reproducible del flujo que en produccion invocaria un trigger o paquete.

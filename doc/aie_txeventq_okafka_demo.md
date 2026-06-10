@@ -2,6 +2,22 @@
 
 Reproducible guide for creating an Oracle TxEventQ topic that can be consumed by Kafka-style clients through Oracle OKafka, publishing messages from PL/SQL, and preparing the next step: a Java consumer based on `okafka.jar`.
 
+## Demo Video
+
+<video controls src="./TxEventQ.mov" title="TxEventQ OKafka PL/SQL producer demo"></video>
+
+If the video does not render inline, open [TxEventQ.mov](./TxEventQ.mov).
+
+The recording shows two command-line sessions: one starts the OKafka consumer, and the other runs the SQLcl publisher. When the PL/SQL script enqueues messages into `AIE_EVENTS`, the Java client receives and prints them as Kafka-style records.
+
+## Use Case: Database Changes as Kafka-Style Events
+
+A common integration requirement is to react to changes that already happen inside Oracle Database: an order is inserted, a payment changes state, or a business table is updated by an existing application. In that model, a database trigger or a PL/SQL package captures the change at the transaction boundary and publishes a compact JSON event to a queue.
+
+This demo shows that pattern with Oracle TxEventQ created as an OKafka-compatible topic. The PL/SQL publisher enqueues JSON messages into `AIE_EVENTS`; a remote Java client uses the Kafka consumer API through Oracle OKafka to receive those events. The remote client keeps Kafka concepts such as topic, consumer group, offset, partition assignment, and poll loop, while the event stream is backed by Oracle Database instead of an external Kafka broker.
+
+The included SQL publisher is intentionally a standalone SQLcl script so the flow is easy to reproduce. In a production design, the same enqueue logic would normally live behind a small PL/SQL package invoked by a trigger or by application code after the business change is validated.
+
 ## 1. Executive Summary
 
 This demo creates a topic named `AIE_EVENTS` in the `AIE` schema.
